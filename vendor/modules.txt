@@ -1,0 +1,8 @@
+# github.com/Fontinalis/fonet v0.2.0
+## explicit; go 1.16
+github.com/Fontinalis/fonet
+# github.com/caarlos0/env v3.5.0+incompatible
+## explicit
+# github.com/caarlos0/env/v6 v6.7.1
+## explicit; go 1.17
+github.com/caarlos0/env/v6

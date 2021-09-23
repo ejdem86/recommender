@@ -1,0 +1,6 @@
+github.com/Fontinalis/fonet v0.2.0 h1:IneGGRj4PKjODrjcUuxFEBy0YFXEahUpuzwR4pCX9B0=
+github.com/Fontinalis/fonet v0.2.0/go.mod h1:jtoMZ3bWIQjelUXNugywYisOq3Bg7aRKA0sLmYyUFSA=
+github.com/caarlos0/env v3.5.0+incompatible h1:Yy0UN8o9Wtr/jGHZDpCBLpNrzcFLLM2yixi/rBrKyJs=
+github.com/caarlos0/env v3.5.0+incompatible/go.mod h1:tdCsowwCzMLdkqRYDlHpZCp2UooDD3MspDBjZ2AD02Y=
+github.com/caarlos0/env/v6 v6.7.1 h1:2r2GyonA8aJX6lDEhwFfpxwAX8Z3mvbE1X6vhaSzEyU=
+github.com/caarlos0/env/v6 v6.7.1/go.mod h1:FE0jGiAnQqtv2TenJ4KTa8+/T2Ss8kdS5s1VEjasoN0=

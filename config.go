@@ -6,6 +6,7 @@ import "github.com/ejdem86/recommender/internal/lib/ml"
 type Config struct {
 	Debug       bool   `env:"DEBUG" envDefault:"true"`
 	RestoreFrom string `env:"RESTORE_FROM" envDefault:""`
+	PersistTo   string `env:"PERSIST_TO" envDefault:"networks/output.network"`
 
 	NetworkConfig
 	LearnConfig
@@ -19,7 +20,8 @@ type NetworkConfig struct {
 }
 
 type LearnConfig struct {
-	TrainingDataSource string  `env:"TRAINING_DATA_SOURCE,required"`
-	Epochs             int     `env:"TRAINING_EPOCHS" envDefault:"100000"`
-	Rate               float64 `env:"TRAINING_RATE" envDefault:"1.1"`
+	TrainingDataSource string  `env:"TRAINING_DATA_SOURCE"`
+	Epochs             int     `env:"TRAINING_EPOCHS" envDefault:"10000"`
+	Rate               float64 `env:"TRAINING_RATE" envDefault:"1.2"`
+	NLevel             bool    `env:"N_LEVEL" envDefault:"true"`
 }

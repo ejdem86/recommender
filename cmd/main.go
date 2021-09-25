@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v6"
 	"github.com/ejdem86/recommender"
@@ -32,9 +33,19 @@ func main() {
 			log.Fatalf("training new network: %v", err)
 		}
 	default:
-		network, err = restoreNetwork(cfg.RestoreFrom)
+		network, err = restoreNetwork(&cfg)
 		if err != nil {
 			log.Fatalf("restoring network: %v", err)
+		}
+
+		if cfg.TrainingDataSource != "" {
+			if err = network.TrainFrom(cfg.TrainingDataSource, &ml.TrainParams{
+				Epochs: cfg.Epochs,
+				Rate:   cfg.Rate,
+				Debug:  cfg.Debug,
+			}); err != nil {
+				log.Fatalf("training network: %v", err)
+			}
 		}
 	}
 
@@ -43,7 +54,12 @@ func main() {
 	go func() {
 		<-closeChannel
 		log.Println("Closing")
-		output, err := os.Create("output.csv")
+		if _, err = os.Stat(cfg.PersistTo); err == nil {
+			if err = os.Rename(cfg.PersistTo, fmt.Sprintf("%s-%d.network", strings.Split(cfg.PersistTo, ".")[0], time.Now().Unix())); err != nil {
+				log.Println("Failed to move old network to a new file:", err)
+			}
+		}
+		output, err := os.Create(cfg.PersistTo)
 		if err != nil {
 			log.Fatalf("Failed to open the output: %v", err)
 		}
@@ -63,18 +79,14 @@ func main() {
 			log.Fatalf("Failed to read input: %v", err)
 		}
 		tmp = strings.ReplaceAll(tmp, "\n", "")
-		predictRequest, err := parsePredictRequest(tmp)
+		predictRequest, expected, err := parsePredictRequest(tmp)
 
-		prediction := network.Predict(predictRequest)
-		fmt.Printf("Predicted value: %v\n", prediction)
+		prediction, isOK := network.PredictVerified(predictRequest, expected, ml.RoundNearest, 3)
+		fmt.Printf("Predicted value: %v, matches: %v\n", prediction, isOK)
 	}
 }
 
 func trainNew(cfg *recommender.Config) (ml.Network, error) {
-	trainingData, err := readTrainingData(cfg.TrainingDataSource)
-	if err != nil {
-		log.Fatalf("Failed to read the training data: %v", err)
-	}
 	layersSetup := []int{cfg.InputLayers}
 	layersSetup = append(layersSetup, cfg.HiddenLayers...)
 	layersSetup = append(layersSetup, cfg.OutputLayers)
@@ -82,22 +94,56 @@ func trainNew(cfg *recommender.Config) (ml.Network, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the network: %v", err)
 	}
-
-	s := trainingData.ToSlice()
-	network.Train(s, cfg.Epochs, cfg.Rate, cfg.Debug)
+	if err = network.TrainFrom(cfg.TrainingDataSource, &ml.TrainParams{
+		Epochs: cfg.Epochs,
+		Rate:   cfg.Rate,
+		Debug:  cfg.Debug,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to train the new network: %v", err)
+	}
 	return network, nil
 }
 
-func restoreNetwork(source string) (ml.Network, error) {
-	f, err := os.OpenFile(source, os.O_RDONLY, fs.ModePerm)
+func restoreNetwork(cfg *recommender.Config) (ml.Network, error) {
+	f, err := os.OpenFile(cfg.RestoreFrom, os.O_RDONLY, fs.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source network: %v", err)
 	}
 	defer f.Close()
-	return ml.Load(f)
+	return ml.Load(f, &ml.TrainParams{
+		Epochs: cfg.Epochs,
+		Rate:   cfg.Rate,
+	})
 }
 
-func parsePredictRequest(s string) ([]float64, error) {
+func parsePredictRequest(s string) ([]float64, []float64, error) {
+	inputS := strings.Split(s, " ")
+	switch len(inputS) {
+	case 1:
+		ret, err := parseFloatSlice(inputS[0])
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(ret) == 0 {
+			return nil, nil, errors.ErrMissingInput
+		}
+		return ret, nil, nil
+	case 2:
+		dataToPredict, err := parseFloatSlice(inputS[0])
+		if err != nil {
+			return nil, nil, err
+		}
+		dataToCompare, err := parseFloatSlice(inputS[1])
+		if err != nil {
+			return nil, nil, err
+		}
+		return dataToPredict, dataToCompare, nil
+	default:
+		return nil, nil, errors.ErrParseInput
+	}
+}
+
+func parseFloatSlice(s string) ([]float64, error) {
 	var ret []float64
 	for _, v := range strings.Split(s, ",") {
 		value, err := strconv.ParseFloat(v, 64)
@@ -106,41 +152,5 @@ func parsePredictRequest(s string) ([]float64, error) {
 		}
 		ret = append(ret, value)
 	}
-	if len(ret) == 0 {
-		return nil, errors.ErrMissingInput
-	}
 	return ret, nil
-}
-
-func readTrainingData(f string) (ml.TrainingData, error) {
-	data, err := os.OpenFile(f, os.O_RDONLY, fs.ModePerm)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errors.ErrReadFile, err)
-	}
-	defer data.Close()
-
-	scanner := bufio.NewScanner(data)
-
-	var td ml.TrainingData
-	for scanner.Scan() {
-		line := strings.Split(scanner.Text(), " ")
-		var ts ml.TrainingSample
-		for _, v := range strings.Split(line[0], ",") {
-			value, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %v", errors.ErrParseInput, err)
-			}
-			ts.Input = append(ts.Input, value)
-		}
-		for _, v := range strings.Split(line[1], ",") {
-			value, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %v", errors.ErrParseInput, err)
-			}
-			ts.Output = append(ts.Output, value)
-		}
-		td = append(td, ts)
-	}
-
-	return td, nil
 }

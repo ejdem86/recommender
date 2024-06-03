@@ -61,6 +61,14 @@ func RoundNearest(a float64, places int) float64 {
 	return math.Round(a*multiplier) / multiplier
 }
 
+func RoundInteger(a float64, _ int) float64 {
+	return math.Round(a)
+}
+
+func NoRound(a float64, _ int) float64 {
+	return a
+}
+
 type Network interface {
 	Export(w io.Writer) error
 	MarshalJSON() ([]byte, error)
@@ -98,10 +106,12 @@ func (n *N) TrainFrom(src string, tp *TrainParams) error {
 }
 
 func (n *N) PredictVerified(in []float64, expected []float64, roundFunc RoundFunc, precision int) ([]float64, bool) {
+	fmt.Println(in, expected)
 	predictions := n.Predict(in)
 	for i, v := range expected {
 		expected[i] = roundFunc(v, precision)
 	}
+	fmt.Println(predictions, expected)
 	for i, v := range predictions {
 		if i > len(expected)-1 {
 			break
@@ -128,7 +138,7 @@ func (n *N) TrainNLevel(td TrainingData, tp *TrainParams, depth int) error {
 
 	var verifiedPredictions TrainingData
 	for _, v := range theRest {
-		_, isOK := n.PredictVerified(v.Input, v.Output, RoundNearest, 5)
+		_, isOK := n.PredictVerified(v.Input, v.Output, NoRound, 5)
 		if isOK {
 			verifiedPredictions = append(verifiedPredictions, v)
 		}

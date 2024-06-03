@@ -72,6 +72,8 @@ func main() {
 		os.Exit(0)
 	}()
 
+	fmt.Println("Input: ")
+
 	user := bufio.NewReader(os.Stdin)
 	for {
 		tmp, err := user.ReadString('\n')
@@ -81,7 +83,7 @@ func main() {
 		tmp = strings.ReplaceAll(tmp, "\n", "")
 		predictRequest, expected, err := parsePredictRequest(tmp)
 
-		prediction, isOK := network.PredictVerified(predictRequest, expected, ml.RoundNearest, 3)
+		prediction, isOK := network.PredictVerified(predictRequest, expected, ml.NoRound, 4)
 		fmt.Printf("Predicted value: %v, matches: %v\n", prediction, isOK)
 	}
 }
